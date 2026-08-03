@@ -182,7 +182,9 @@ function render(d) {
     ['Sessions listed', d.sessions.length],
     ['Dates with showings', dateCount],
     ['Furthest date', last ? prettyDate(last) : '—'],
-    ['Last checked', d.checking ? 'checking…' : ago(lc && lc.at)],
+    // Always show when it last succeeded. Showing only "checking…" hid the one fact
+    // that proves the watcher is alive, so a paused frame looked like a hang.
+    ['Last checked', `${ago(lc && lc.at)}${d.checking ? ' <small>· checking…</small>' : ''}`],
   ].map(([k,v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
 
   document.getElementById('note').textContent = lc && lc.errors
@@ -358,8 +360,21 @@ async function renderPush() {
 if (pushSupported) navigator.serviceWorker.register('/sw.js').catch(() => {});
 renderPush();
 
+// iOS suspends timers in a backgrounded home-screen web app, so setInterval alone leaves
+// you staring at whatever was on screen when it froze. Refresh whenever the app comes
+// back to the foreground — that is the moment you are actually looking at it.
+let lastLoad = 0;
+async function refresh() {
+  if (Date.now() - lastLoad < 2000) return;   // coalesce the visibility/focus/pageshow burst
+  lastLoad = Date.now();
+  try { await load(); } catch (e) { /* offline — the next trigger retries */ }
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+window.addEventListener('focus', refresh);
+window.addEventListener('pageshow', refresh);
+
 load();
-setInterval(load, 60000);
+setInterval(refresh, 30000);
 </script>
 </body>
 </html>
