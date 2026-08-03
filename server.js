@@ -25,7 +25,11 @@ app.get('/api/state', (req, res) => {
       timezone: config.timezone,
       notifyTo: config.notifyTo ? config.notifyTo.replace(/^(.).*(@.*)$/, '$1•••$2') : null,
       emailConfigured: notify.isConfigured(),
+      emailProblem: notify.configProblem(),
+      emailProvider: notify.provider(),
+      mailFrom: notify.fromAddress(),
     },
+    lastEmail: state.lastEmail,
     lastCheck: state.lastCheck,
     checking: watcher.isRunning(),
     movieName: state.sessions[0]?.movieName || null,
@@ -55,6 +59,8 @@ app.post('/api/test-email', async (req, res) => {
     movieName: sample[0]?.movieName || config.movieCode,
     cinemaName: sample[0]?.cinemaName || `Cinema ${config.cinemaIds.join(',')}`,
   });
+  state.lastEmail = { ...result, test: true };
+  store.save(state);
   res.status(result.sent ? 200 : 503).json(result);
 });
 

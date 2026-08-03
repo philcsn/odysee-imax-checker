@@ -64,6 +64,7 @@
   .empty { padding:30px 16px; text-align:center; color:var(--muted); font-size:14px; }
   .note { font-size:13px; color:var(--muted); margin:-16px 0 26px; }
   .warn { background:var(--bad-soft); color:var(--bad); border-radius:9px; padding:11px 14px; font-size:14px; margin-bottom:22px; }
+  .warn.ok { background:var(--good-soft); color:var(--good); }
   a { color:var(--accent); }
   @media (max-width:560px) { .row { display:block; } .row .d { margin-bottom:8px; } }
 </style>
@@ -131,11 +132,22 @@ function render(d) {
     `${d.cinemaName || 'Cinema ' + cfg.cinemaIds.join(',')} · every ${cfg.pollMinutes} min · ${cfg.daysAhead}-day window`;
   document.getElementById('book').href = `${cfg.movieUrl}#cinemas=${cfg.cinemaIds.join(',')}`;
 
+  // Three states worth distinguishing: not set up, set up but the last send failed,
+  // and healthy. A silently failing mailer is the whole reason this banner exists.
   const warn = document.getElementById('warn');
+  const le = d.lastEmail;
   if (!cfg.emailConfigured) {
-    warn.hidden = false;
-    warn.textContent = 'Email is not configured — changes will be tracked here but nothing will be sent. Set SMTP_HOST, SMTP_USER, SMTP_PASS and NOTIFY_TO.';
-  } else { warn.hidden = true; }
+    warn.hidden = false; warn.className = 'warn';
+    warn.textContent = `Email is not configured — changes are tracked here but nothing will be sent. ${cfg.emailProblem || ''}`;
+  } else if (le && !le.sent) {
+    warn.hidden = false; warn.className = 'warn';
+    warn.textContent = `Last email failed (${le.provider}): ${le.reason}`;
+  } else {
+    warn.hidden = false; warn.className = 'warn ok';
+    warn.textContent = le && le.sent
+      ? `Email working — last sent ${ago(le.at)} via ${le.provider} from ${cfg.mailFrom} to ${cfg.notifyTo}.`
+      : `Email ready — ${cfg.emailProvider}, from ${cfg.mailFrom} to ${cfg.notifyTo}. Nothing sent yet.`;
+  }
 
   const lc = d.lastCheck;
   const dateCount = new Set(d.sessions.map(s => s.date)).size;

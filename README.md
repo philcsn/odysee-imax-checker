@@ -60,8 +60,25 @@ See `.env.example`. The ones that matter:
 | `POLL_MINUTES` | `30` | |
 | `TIMEZONE` | `Australia/Sydney` | Cinema-local, not server-local |
 | `NOTIFY_TO` | — | Where alerts go |
-| `SMTP_HOST/PORT/USER/PASS` | — | Same vars as `atrya-site` |
+| `RESEND_API_KEY` | — | Preferred mailer; wins over SMTP if both are set |
+| `MAIL_FROM_ADDRESS` | `onboarding@resend.dev` | Must be a verified Resend sender |
+| `SMTP_HOST/PORT/USER/PASS` | — | Fallback. Same vars as `atrya-site` |
 | `STATE_DIR` | `./data` | **Point at a Railway volume** — see DEPLOY.md |
+
+## Email
+
+Resend's HTTP API is used in preference to its SMTP bridge: it answers on 443, returns a
+message id, and fails with a readable reason. That reason is persisted to state and shown
+on the dashboard, because a mailer that fails quietly defeats the point of the watcher.
+
+The default sender `onboarding@resend.dev` is Resend's sandbox — it can **only** deliver
+to the address the Resend account was registered with. A 403 from that sender is
+explained inline in the error. To send from your own address to anywhere, verify a domain
+in Resend and set `MAIL_FROM_ADDRESS` (e.g. `watch@atrya.io`).
+
+Note that Resend's *SMTP* username is the literal string `resend`, which is not a valid
+From address — so `MAIL_FROM_ADDRESS` is required on that path, and the app refuses to
+start sending rather than emitting a malformed header.
 
 ### Watching something else
 

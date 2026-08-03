@@ -50,15 +50,36 @@ railway variables --set STATE_DIR=/data \
                   --set DAYS_AHEAD=70
 ```
 
-SMTP — copy the values already working on `atrya-site`:
+### Email via Resend (preferred)
+
+```bash
+railway variables --set RESEND_API_KEY=re_your_key_here
+```
+
+That's enough to start: the sender defaults to `onboarding@resend.dev`, which delivers
+**only** to the address your Resend account is registered with. If `NOTIFY_TO` is a
+different address you'll get a 403, and the dashboard will say so.
+
+To send from your own domain to any recipient, verify `atrya.io` in Resend
+(Domains → Add Domain, then add the SPF + DKIM records it gives you) and set:
+
+```bash
+railway variables --set MAIL_FROM_ADDRESS=watch@atrya.io
+```
+
+<details><summary>SMTP fallback</summary>
+
+Only used when `RESEND_API_KEY` is unset.
 
 ```bash
 railway variables --set SMTP_HOST=... --set SMTP_PORT=587 \
                   --set SMTP_USER=... --set SMTP_PASS=...
 ```
 
-> iCloud note: if you send via iCloud SMTP (`smtp.mail.me.com:587`), `SMTP_PASS` must be
-> an **app-specific password** from appleid.apple.com, not your Apple ID password.
+Resend's SMTP username is the literal `resend`, so `MAIL_FROM_ADDRESS` is mandatory there.
+For iCloud SMTP (`smtp.mail.me.com:587`), `SMTP_PASS` must be an **app-specific password**
+from appleid.apple.com, not your Apple ID password.
+</details>
 
 ### 3. Verify
 
