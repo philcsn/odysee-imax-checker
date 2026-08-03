@@ -1,5 +1,14 @@
 # Deploy
 
+**Live:** https://odysee-imax-checker-production.up.railway.app
+**Railway project:** `odysee-imax-checker` · service `odysee-imax-checker` · volume mounted at `/data`
+**GitHub:** `philcsn/odysee-imax-checker`
+
+> The Railway service is **not** yet connected to the GitHub repo — Railway's GitHub App
+> couldn't see the freshly created repo, so this deployed from local source. Until you
+> connect it (Railway dashboard → service → Settings → Source → Connect Repo), pushes to
+> GitHub will *not* auto-deploy; redeploy with `railway up` from this directory.
+
 Always run from this directory:
 
 ```
