@@ -4,13 +4,16 @@
   "private": true,
   "description": "Watches Event Cinemas session listings and emails when new showings are added",
   "main": "server.js",
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node server.js",
     "check": "node scripts/check-once.js"
   },
   "dependencies": {
     "express": "^4.19.2",
-    "nodemailer": "^6.9.9"
+    "nodemailer": "^6.9.9",
+    "web-push": "^3.6.7"
   }
 }

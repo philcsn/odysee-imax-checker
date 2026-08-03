@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Event Cinemas Watch</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icons/icon-180.png">
+<link rel="icon" href="/icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="IMAX Watch">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0e1116">
 <style>
   :root {
     --bg:#f6f7f9; --card:#fff; --fg:#101418; --muted:#697180; --line:#e3e6ea;
@@ -70,6 +77,13 @@
   .note { font-size:13px; color:var(--muted); margin:-16px 0 26px; }
   .warn { background:var(--bad-soft); color:var(--bad); border-radius:9px; padding:11px 14px; font-size:14px; margin-bottom:22px; }
   .warn.ok { background:var(--good-soft); color:var(--good); }
+  .pushbox { background:var(--card); border:1px solid var(--line); border-radius:11px;
+             padding:14px 16px; font-size:14px; margin-bottom:22px; box-shadow:var(--shadow); }
+  .pushbox.on { background:var(--good-soft); border-color:transparent; color:var(--good); }
+  .pushbox b { display:block; margin-bottom:4px; font-size:14px; }
+  .pushbox ol { margin:8px 0 0; padding-left:20px; color:var(--muted); }
+  .pushbox li { margin:3px 0; }
+  .pushbox button { margin-top:10px; }
   a { color:var(--accent); }
   @media (max-width:560px) { .row { display:block; } .row .d { margin-bottom:8px; } }
 </style>
@@ -90,6 +104,7 @@
   </header>
 
   <div id="warn" class="warn" hidden></div>
+  <div id="pushbox" class="pushbox" hidden></div>
   <div class="stats" id="stats"></div>
 
   <h2>New since watching began</h2>
@@ -244,6 +259,104 @@ document.getElementById('test').onclick = async (e) => {
   e.target.textContent = j.sent ? 'Sent ✓' : 'Failed';
   setTimeout(() => { e.target.textContent = 'Test email'; e.target.disabled = false; }, 2500);
 };
+
+// ─── Push notifications ───────────────────────────────────────────────────────
+
+// Evaluated per call rather than once at load: display-mode can change, and it keeps
+// each branch reachable from the console for testing.
+const isIOS = () => /iP(hone|ad|od)/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isStandalone = () => window.navigator.standalone === true ||
+  window.matchMedia('(display-mode: standalone)').matches;
+const pushSupported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+
+function urlB64ToUint8Array(base64) {
+  const padded = (base64 + '='.repeat((4 - base64.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(padded);
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+async function currentSubscription() {
+  if (!pushSupported) return null;
+  const reg = await navigator.serviceWorker.getRegistration();
+  return reg ? reg.pushManager.getSubscription() : null;
+}
+
+async function renderPush() {
+  const box = document.getElementById('pushbox');
+  box.hidden = false;
+  box.className = 'pushbox';
+
+  // On iOS, Notification/PushManager exist in a Safari tab but subscribing always fails.
+  // Checking standalone first turns a confusing error into an instruction.
+  if (isIOS() && !isStandalone()) {
+    box.innerHTML = `<b>Phone notifications</b>iOS only allows these from a home-screen app.
+      <ol><li>Tap the Share button</li><li>Choose “Add to Home Screen”</li>
+      <li>Open it from the new icon, then tap Enable here</li></ol>`;
+    return;
+  }
+  if (!pushSupported) {
+    box.innerHTML = `<b>Push isn’t supported in this browser</b>Email alerts are unaffected.`;
+    return;
+  }
+  if (Notification.permission === 'denied') {
+    box.innerHTML = `<b>Notifications are blocked</b>Re-enable them for this app in your device settings, then reload.`;
+    return;
+  }
+
+  const sub = await currentSubscription();
+  if (Notification.permission === 'granted' && sub) {
+    box.className = 'pushbox on';
+    box.innerHTML = `<b>Notifications are on for this device</b>You'll get a push as well as an email when showings are added.
+      <div><button id="pushtest">Send a test</button> <button id="pushoff">Turn off</button></div>`;
+    document.getElementById('pushtest').onclick = async (e) => {
+      e.target.disabled = true; e.target.textContent = 'Sending…';
+      const r = await fetch('/api/push/test', { method: 'POST' }).then(x => x.json()).catch(() => ({ sent: 0 }));
+      e.target.textContent = r.sent > 0 ? 'Sent ✓' : `Failed: ${r.reason || 'no devices'}`;
+      setTimeout(() => { e.target.textContent = 'Send a test'; e.target.disabled = false; }, 3000);
+    };
+    document.getElementById('pushoff').onclick = async (e) => {
+      e.target.disabled = true;
+      const s = await currentSubscription();
+      if (s) {
+        await fetch('/api/push/unsubscribe', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ endpoint: s.endpoint }),
+        });
+        await s.unsubscribe();
+      }
+      renderPush(); load();
+    };
+    return;
+  }
+
+  box.innerHTML = `<b>Get a push notification on this device</b>Email keeps working either way — this just gets it to you faster.
+    <div><button id="pushon" class="primary">Enable notifications</button></div>`;
+  document.getElementById('pushon').onclick = async (e) => {
+    e.target.disabled = true; e.target.textContent = 'Enabling…';
+    try {
+      // Must be inside the click handler: iOS ignores permission requests without a gesture.
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') return renderPush();
+      const reg = await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
+      const { publicKey } = await (await fetch('/api/push/key')).json();
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlB64ToUint8Array(publicKey),
+      });
+      await fetch('/api/push/subscribe', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sub),
+      });
+      renderPush(); load();
+    } catch (err) {
+      box.innerHTML = `<b>Couldn’t enable notifications</b>${err.message}`;
+    }
+  };
+}
+
+if (pushSupported) navigator.serviceWorker.register('/sw.js').catch(() => {});
+renderPush();
 
 load();
 setInterval(load, 60000);

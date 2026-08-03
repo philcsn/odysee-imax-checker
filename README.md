@@ -38,6 +38,30 @@ Three things stop routine churn from firing a false alert:
 By default only **additions** trigger email. Set `NOTIFY_ON_REMOVED=true` to also be
 told when a showing disappears.
 
+## Push notifications (iOS)
+
+Push runs *alongside* email, never instead of it — iOS subscriptions lapse silently, so
+email stays the channel that can't quietly stop working.
+
+**iOS will not allow notifications from a Safari tab.** The site must be installed:
+Share → Add to Home Screen → open it from the icon → tap **Enable notifications**. The
+dashboard detects a Safari tab on iOS and shows those steps instead of a button that
+would fail.
+
+Three implementation details that matter:
+
+- **VAPID keys are generated on first use and persisted to the volume**, not supplied as
+  env vars. Nobody handles the private key and it never reaches a shell history. Set
+  `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` to override with a fixed pair.
+- **The VAPID subject must be a `mailto:` or `https://` URL** — Apple returns 403 from
+  `web.push.apple.com` for anything else. Defaults to `mailto:$NOTIFY_TO`.
+- **The service worker always calls `showNotification`**, even on an unparseable payload.
+  iOS treats a push that displays nothing as silent and revokes the subscription after a
+  few of them.
+
+Subscriptions that return 404/410 are pruned automatically, so a deleted web app doesn't
+get retried forever.
+
 ## Endpoints
 
 | Route | Purpose |
@@ -45,7 +69,11 @@ told when a showing disappears.
 | `GET /` | Dashboard — sessions by date, change history, last check |
 | `GET /api/state` | Full state as JSON |
 | `POST /api/check` | Run a check immediately |
-| `POST /api/test-email` | Send a sample email to verify SMTP |
+| `POST /api/test-email` | Send a sample email to verify the mailer |
+| `GET /api/push/key` | VAPID public key for subscribing |
+| `POST /api/push/subscribe` | Register a device |
+| `POST /api/push/unsubscribe` | Remove a device by `endpoint` |
+| `POST /api/push/test` | Send a test push to every registered device |
 | `GET /healthz` | Railway health check |
 
 ## Config
