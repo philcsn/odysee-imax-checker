@@ -31,6 +31,7 @@ app.get('/api/state', (req, res) => {
     },
     lastEmail: state.lastEmail,
     lastCheck: state.lastCheck,
+    watchingSince: state.watchingSince,
     checking: watcher.isRunning(),
     movieName: state.sessions[0]?.movieName || null,
     cinemaName: state.sessions[0]?.cinemaName || null,

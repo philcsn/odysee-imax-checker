@@ -45,6 +45,11 @@
   .stat .v small { font-size:13px; font-weight:400; color:var(--muted); }
 
   h2 { font-size:16px; margin:0 0 12px; letter-spacing:-.01em; }
+  h2 .qual { font-weight:400; font-size:13px; color:var(--muted); margin-left:6px; }
+  .newdate { display:inline-block; background:var(--good); color:var(--bg); font-size:11px;
+             font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+             border-radius:4px; padding:2px 7px; margin-left:8px; vertical-align:middle; }
+  .spotted { font-size:12px; color:var(--muted); margin-top:6px; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:11px; box-shadow:var(--shadow); overflow:hidden; margin-bottom:28px; }
   .row { display:flex; gap:14px; padding:12px 16px; border-bottom:1px solid var(--line); align-items:baseline; }
   .row:last-child { border-bottom:none; }
@@ -87,7 +92,11 @@
   <div id="warn" class="warn" hidden></div>
   <div class="stats" id="stats"></div>
 
-  <h2>Upcoming sessions</h2>
+  <h2>New since watching began</h2>
+  <p class="note" id="newNote"></p>
+  <div class="card" id="newSessions"><div class="empty">Loading…</div></div>
+
+  <h2>Upcoming sessions <span class="qual">full schedule</span></h2>
   <p class="note" id="note"></p>
   <div class="card" id="sessions"><div class="empty">Loading…</div></div>
 
@@ -152,7 +161,9 @@ function render(d) {
   const lc = d.lastCheck;
   const dateCount = new Set(d.sessions.map(s => s.date)).size;
   const last = d.sessions.length ? d.sessions[d.sessions.length - 1].date : null;
+  const newCount = d.history.reduce((n, h) => n + h.added.length, 0);
   document.getElementById('stats').innerHTML = [
+    ['New since watching', newCount],
     ['Sessions listed', d.sessions.length],
     ['Dates with showings', dateCount],
     ['Furthest date', last ? prettyDate(last) : '—'],
@@ -161,6 +172,39 @@ function render(d) {
 
   document.getElementById('note').textContent = lc && lc.errors
     ? `Heads up: ${lc.errors} date(s) failed to fetch on the last run.` : '';
+
+  // Everything ever reported as added, still listed and still upcoming. Walking history
+  // oldest-first means a re-added session keeps its most recent sighting; dropping keys
+  // absent from d.sessions means something added then pulled doesn't linger up top.
+  const addedAt = new Map();
+  const newDateSet = new Set();
+  for (const h of [...d.history].reverse()) {
+    for (const s of h.added) addedAt.set(s.key, { s, at: h.at });
+    for (const dt of (h.newDates || [])) newDateSet.add(dt);
+  }
+  const liveKeys = new Set(d.sessions.map(s => s.key));
+  const fresh = [...addedAt.values()].filter(x => liveKeys.has(x.s.key));
+  const freshByDate = groupByDate(fresh.map(x => x.s));
+  const spottedFor = (list) => {
+    const times = list.map(s => addedAt.get(s.key)?.at).filter(Boolean).sort();
+    return times.length ? ago(times[times.length - 1]) : null;
+  };
+
+  document.getElementById('newNote').textContent = d.watchingSince
+    ? `Watching since ${new Date(d.watchingSince).toLocaleString()}.`
+    : '';
+
+  document.getElementById('newSessions').innerHTML = freshByDate.length
+    ? freshByDate.map(([date, list]) => `
+        <div class="row">
+          <div class="d">${prettyDate(date)}<em>${date.slice(0,4)}</em></div>
+          <div>
+            <div class="chips">${chips(list, 'new')}</div>
+            ${newDateSet.has(date) ? '<span class="newdate">new date</span>' : ''}
+            <div class="spotted">spotted ${spottedFor(list) || 'recently'}</div>
+          </div>
+        </div>`).join('')
+    : `<div class="empty">Nothing added yet — the ${d.sessions.length} sessions below were already listed when watching began.<br>You'll be emailed the moment one appears.</div>`;
 
   const groups = groupByDate(d.sessions);
   document.getElementById('sessions').innerHTML = groups.length
