@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Event Cinemas Watch</title>
+<style>
+  :root {
+    --bg:#f6f7f9; --card:#fff; --fg:#101418; --muted:#697180; --line:#e3e6ea;
+    --accent:#1e40af; --accent-soft:#eef2ff; --good:#15803d; --good-soft:#e9f7ee;
+    --bad:#b91c1c; --bad-soft:#fdeceb; --shadow:0 1px 2px rgba(16,20,24,.06),0 4px 16px rgba(16,20,24,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#0e1116; --card:#161b22; --fg:#e6edf3; --muted:#8b949e; --line:#262c36;
+      --accent:#7aa2ff; --accent-soft:#1a2440; --good:#4ade80; --good-soft:#132a1c;
+      --bad:#f87171; --bad-soft:#2c1618; --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 16px rgba(0,0,0,.25);
+    }
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--bg); color:var(--fg);
+    font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap { max-width:940px; margin:0 auto; padding:32px 20px 72px; }
+
+  header { display:flex; flex-wrap:wrap; gap:16px; align-items:flex-start; justify-content:space-between; margin-bottom:28px; }
+  .eyebrow { font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin:0 0 6px; }
+  h1 { margin:0 0 4px; font-size:26px; letter-spacing:-.02em; }
+  .sub { margin:0; color:var(--muted); font-size:15px; }
+  .actions { display:flex; gap:8px; }
+  button {
+    font:inherit; font-size:14px; padding:9px 15px; border-radius:8px; cursor:pointer;
+    border:1px solid var(--line); background:var(--card); color:var(--fg); transition:.15s;
+  }
+  button:hover:not(:disabled) { border-color:var(--muted); }
+  button.primary { background:var(--fg); color:var(--bg); border-color:var(--fg); }
+  button:disabled { opacity:.5; cursor:default; }
+
+  .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:28px; }
+  .stat { background:var(--card); border:1px solid var(--line); border-radius:11px; padding:14px 16px; box-shadow:var(--shadow); }
+  .stat .k { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:5px; }
+  .stat .v { font-size:22px; font-weight:600; letter-spacing:-.02em; }
+  .stat .v small { font-size:13px; font-weight:400; color:var(--muted); }
+
+  h2 { font-size:16px; margin:0 0 12px; letter-spacing:-.01em; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:11px; box-shadow:var(--shadow); overflow:hidden; margin-bottom:28px; }
+  .row { display:flex; gap:14px; padding:12px 16px; border-bottom:1px solid var(--line); align-items:baseline; }
+  .row:last-child { border-bottom:none; }
+  .row .d { flex:0 0 150px; font-weight:600; font-size:14px; }
+  .row .d em { display:block; font-style:normal; font-weight:400; font-size:12px; color:var(--muted); }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .chip { background:var(--accent-soft); color:var(--accent); border-radius:6px; padding:3px 9px; font-size:13px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .chip.new { background:var(--good-soft); color:var(--good); font-weight:600; }
+  .chip.gone { background:var(--bad-soft); color:var(--bad); text-decoration:line-through; }
+
+  .feed .row { display:block; }
+  .feed .when { font-size:12px; color:var(--muted); margin-bottom:7px; }
+  .feed .tag { display:inline-block; font-size:12px; font-weight:600; padding:2px 8px; border-radius:5px; margin-right:8px; }
+  .tag.up { background:var(--good-soft); color:var(--good); }
+  .tag.down { background:var(--bad-soft); color:var(--bad); }
+
+  .empty { padding:30px 16px; text-align:center; color:var(--muted); font-size:14px; }
+  .note { font-size:13px; color:var(--muted); margin:-16px 0 26px; }
+  .warn { background:var(--bad-soft); color:var(--bad); border-radius:9px; padding:11px 14px; font-size:14px; margin-bottom:22px; }
+  a { color:var(--accent); }
+  @media (max-width:560px) { .row { display:block; } .row .d { margin-bottom:8px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <p class="eyebrow">Event Cinemas watch</p>
+      <h1 id="title">Loading…</h1>
+      <p class="sub" id="subtitle"></p>
+    </div>
+    <div class="actions">
+      <button id="check">Check now</button>
+      <button id="test">Test email</button>
+      <a id="book" href="#" target="_blank" rel="noopener"><button class="primary">Book</button></a>
+    </div>
+  </header>
+
+  <div id="warn" class="warn" hidden></div>
+  <div class="stats" id="stats"></div>
+
+  <h2>Upcoming sessions</h2>
+  <p class="note" id="note"></p>
+  <div class="card" id="sessions"><div class="empty">Loading…</div></div>
+
+  <h2>Change history</h2>
+  <div class="card feed" id="history"><div class="empty">Loading…</div></div>
+</div>
+
+<script>
+const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+const prettyDate = iso => {
+  const d = new Date(iso + 'T00:00:00Z');
+  return `${DAYS[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+};
+const prettyTime = hhmm => {
+  const [h, m] = hhmm.split(':').map(Number);
+  return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2,'0')}${h < 12 ? 'am' : 'pm'}`;
+};
+const ago = iso => {
+  if (!iso) return 'never';
+  const s = Math.floor((Date.now() - new Date(iso)) / 1000);
+  if (s < 60) return 'just now';
+  if (s < 3600) return `${Math.floor(s/60)}m ago`;
+  if (s < 86400) return `${Math.floor(s/3600)}h ago`;
+  return `${Math.floor(s/86400)}d ago`;
+};
+const groupByDate = list => {
+  const m = new Map();
+  for (const s of list) { if (!m.has(s.date)) m.set(s.date, []); m.get(s.date).push(s); }
+  return [...m.entries()].sort((a,b) => a[0].localeCompare(b[0]));
+};
+const chips = (list, cls = '') => list
+  .sort((a,b) => a.time.localeCompare(b.time))
+  .map(s => `<span class="chip ${cls}">${prettyTime(s.time)}${s.screenType ? ' · ' + s.screenType : ''}</span>`)
+  .join('');
+
+function render(d) {
+  const cfg = d.config;
+  document.getElementById('title').textContent = d.movieName || cfg.movieCode;
+  document.getElementById('subtitle').textContent =
+    `${d.cinemaName || 'Cinema ' + cfg.cinemaIds.join(',')} · every ${cfg.pollMinutes} min · ${cfg.daysAhead}-day window`;
+  document.getElementById('book').href = `${cfg.movieUrl}#cinemas=${cfg.cinemaIds.join(',')}`;
+
+  const warn = document.getElementById('warn');
+  if (!cfg.emailConfigured) {
+    warn.hidden = false;
+    warn.textContent = 'Email is not configured — changes will be tracked here but nothing will be sent. Set SMTP_HOST, SMTP_USER, SMTP_PASS and NOTIFY_TO.';
+  } else { warn.hidden = true; }
+
+  const lc = d.lastCheck;
+  const dateCount = new Set(d.sessions.map(s => s.date)).size;
+  const last = d.sessions.length ? d.sessions[d.sessions.length - 1].date : null;
+  document.getElementById('stats').innerHTML = [
+    ['Sessions listed', d.sessions.length],
+    ['Dates with showings', dateCount],
+    ['Furthest date', last ? prettyDate(last) : '—'],
+    ['Last checked', d.checking ? 'checking…' : ago(lc && lc.at)],
+  ].map(([k,v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+
+  document.getElementById('note').textContent = lc && lc.errors
+    ? `Heads up: ${lc.errors} date(s) failed to fetch on the last run.` : '';
+
+  const groups = groupByDate(d.sessions);
+  document.getElementById('sessions').innerHTML = groups.length
+    ? groups.map(([date, list]) =>
+        `<div class="row"><div class="d">${prettyDate(date)}<em>${date.slice(0,4)}</em></div>
+         <div class="chips">${chips(list)}</div></div>`).join('')
+    : '<div class="empty">No upcoming sessions listed.</div>';
+
+  document.getElementById('history').innerHTML = d.history.length
+    ? d.history.map(h => `
+        <div class="row">
+          <div class="when">${new Date(h.at).toLocaleString()} · ${ago(h.at)}</div>
+          ${h.added.length ? `<div style="margin-bottom:8px;"><span class="tag up">+${h.added.length} added</span>
+            <span class="chips" style="display:inline-flex;">${groupByDate(h.added).map(([dt,l]) =>
+              `<span class="chip new">${prettyDate(dt)}: ${l.map(s => prettyTime(s.time)).join(', ')}</span>`).join('')}</span></div>` : ''}
+          ${h.removed.length ? `<div><span class="tag down">−${h.removed.length} removed</span>
+            <span class="chips" style="display:inline-flex;">${groupByDate(h.removed).map(([dt,l]) =>
+              `<span class="chip gone">${prettyDate(dt)}: ${l.map(s => prettyTime(s.time)).join(', ')}</span>`).join('')}</span></div>` : ''}
+        </div>`).join('')
+    : '<div class="empty">No changes seen yet. The baseline is set — you\'ll be emailed when sessions are added.</div>';
+}
+
+async function load() {
+  const r = await fetch('/api/state');
+  render(await r.json());
+}
+
+document.getElementById('check').onclick = async (e) => {
+  e.target.disabled = true; e.target.textContent = 'Checking…';
+  try { await fetch('/api/check', { method:'POST' }); await load(); }
+  finally { e.target.disabled = false; e.target.textContent = 'Check now'; }
+};
+document.getElementById('test').onclick = async (e) => {
+  e.target.disabled = true;
+  const r = await fetch('/api/test-email', { method:'POST' });
+  const j = await r.json();
+  e.target.textContent = j.sent ? 'Sent ✓' : 'Failed';
+  setTimeout(() => { e.target.textContent = 'Test email'; e.target.disabled = false; }, 2500);
+};
+
+load();
+setInterval(load, 60000);
+</script>
+</body>
+</html>
