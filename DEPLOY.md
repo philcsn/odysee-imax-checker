@@ -56,16 +56,21 @@ railway variables --set STATE_DIR=/data \
 railway variables --set RESEND_API_KEY=re_your_key_here
 ```
 
-That's enough to start: the sender defaults to `onboarding@resend.dev`, which delivers
-**only** to the address your Resend account is registered with. If `NOTIFY_TO` is a
-different address you'll get a 403, and the dashboard will say so.
-
-To send from your own domain to any recipient, verify `atrya.io` in Resend
-(Domains → Add Domain, then add the SPF + DKIM records it gives you) and set:
+That is the entire setup — **no domain required**. The sender defaults to
+`onboarding@resend.dev`, which delivers only to the address your Resend account is
+registered with. Since this app only ever mails one person, that restriction is a
+non-issue: just make sure `NOTIFY_TO` is that same address.
 
 ```bash
-railway variables --set MAIL_FROM_ADDRESS=watch@atrya.io
+railway variables --set NOTIFY_TO=<the email you signed up to Resend with>
 ```
+
+If the two don't match you'll get a 403, and the dashboard will name the address it
+tried, so the fix is obvious.
+
+Want alerts at a *different* address than your Resend login? Two options, neither needing
+a domain: sign up to Resend with the address you want alerts at, or use the SMTP fallback
+below with a personal mailbox.
 
 <details><summary>SMTP fallback</summary>
 

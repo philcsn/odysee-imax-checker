@@ -62,7 +62,7 @@ See `.env.example`. The ones that matter:
 | `NOTIFY_TO` | — | Where alerts go |
 | `RESEND_API_KEY` | — | Preferred mailer; wins over SMTP if both are set |
 | `MAIL_FROM_ADDRESS` | `onboarding@resend.dev` | Must be a verified Resend sender |
-| `SMTP_HOST/PORT/USER/PASS` | — | Fallback. Same vars as `atrya-site` |
+| `SMTP_HOST/PORT/USER/PASS` | — | Fallback, used only if `RESEND_API_KEY` is unset |
 | `STATE_DIR` | `./data` | **Point at a Railway volume** — see DEPLOY.md |
 
 ## Email
@@ -71,10 +71,15 @@ Resend's HTTP API is used in preference to its SMTP bridge: it answers on 443, r
 message id, and fails with a readable reason. That reason is persisted to state and shown
 on the dashboard, because a mailer that fails quietly defeats the point of the watcher.
 
-The default sender `onboarding@resend.dev` is Resend's sandbox — it can **only** deliver
-to the address the Resend account was registered with. A 403 from that sender is
-explained inline in the error. To send from your own address to anywhere, verify a domain
-in Resend and set `MAIL_FROM_ADDRESS` (e.g. `watch@atrya.io`).
+**No domain is required.** The default sender `onboarding@resend.dev` can only deliver to
+the address the Resend account was registered with — which is exactly this app's use case,
+since it mails one person. Keep `NOTIFY_TO` equal to your Resend signup address and it
+works with nothing else configured. A 403 from that sender means the two don't match, and
+the error names the address it tried.
+
+Owning a domain only becomes relevant if you want alerts sent somewhere other than your
+Resend login; verify it in Resend and set `MAIL_FROM_ADDRESS`. The SMTP fallback covers
+that case too, without a domain.
 
 Note that Resend's *SMTP* username is the literal string `resend`, which is not a valid
 From address — so `MAIL_FROM_ADDRESS` is required on that path, and the app refuses to
